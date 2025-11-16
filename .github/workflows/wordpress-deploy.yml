@@ -121,19 +121,25 @@ jobs:
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.1
-        env:
-          DEPLOY_ENVIRONMENT: ${{ needs.derive-deployment-metadata.outputs.environment }}
-          DEPLOY_BRANCH: ${{ needs.derive-deployment-metadata.outputs.branch_name }}
-          DEPLOY_IMAGE_TAG: ${{ needs.derive-deployment-metadata.outputs.image_tag }}
-          DEPLOY_WP_DOMAIN: ${{ needs.derive-deployment-metadata.outputs.wp_domain }}
-          DEPLOY_WP_PMA_DOMAIN: ${{ needs.derive-deployment-metadata.outputs.wp_pma_domain }}
-          DEPLOY_WP_SLUG: ${{ needs.derive-deployment-metadata.outputs.wp_slug }}
+        # Avoid relying on action env forwarding (appleboy/ssh-action doesn't reliably
+        # export these values to the remote shell under `set -u`). Instead use
+        # interpolation directly in the remote script below to set each variable.
         with:
           host: ${{ secrets.TSBI_HOST }}
           username: ${{ secrets.TSBI_USER }}
           key: ${{ secrets.TSBI_SSH_KEY }}
           script: |
             set -euo pipefail
+            # Populate deployment metadata directly in the remote shell to avoid
+            # appleboy/ssh-action env forwarding issues which caused unbound
+            # variable errors (e.g., DEPLOY_BRANCH) when `set -u` is used.
+            DEPLOY_BRANCH="${{ needs.derive-deployment-metadata.outputs.branch_name }}"
+            DEPLOY_ENVIRONMENT="${{ needs.derive-deployment-metadata.outputs.environment }}"
+            DEPLOY_IMAGE_TAG="${{ needs.derive-deployment-metadata.outputs.image_tag }}"
+            DEPLOY_WP_DOMAIN="${{ needs.derive-deployment-metadata.outputs.wp_domain }}"
+            DEPLOY_WP_PMA_DOMAIN="${{ needs.derive-deployment-metadata.outputs.wp_pma_domain }}"
+            DEPLOY_WP_SLUG="${{ needs.derive-deployment-metadata.outputs.wp_slug }}"
+
             IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             echo "Deploying branch: ${DEPLOY_BRANCH} (${DEPLOY_ENVIRONMENT})"
             # Login to registry on VPS
