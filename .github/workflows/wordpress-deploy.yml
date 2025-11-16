@@ -1,0 +1,62 @@
+name: Build, Push & Deploy WordPress
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: registry.tsbi.fun
+  IMAGE_NAME: ${{ github.repository }}-wordpress
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login $REGISTRY -u "${{ secrets.REGISTRY_USER }}" --password-stdin
+
+      - name: Build & push image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+  deploy-to-vps:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+
+    steps:
+      - name: Add VPS host to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.TSBI_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.1
+        with:
+          host: ${{ secrets.TSBI_HOST }}
+          username: ${{ secrets.TSBI_USER }}
+          key: ${{ secrets.TSBI_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            # update stack with the new image using env substitution
+            export WP_TESTING_IMAGE=${IMAGE}
+            docker stack deploy -c /data/ecosystem/deployments/wordpress/stack-wordpress.yml wordpress
+            # Optionally wait for service update to converge
+            docker service update --image ${IMAGE} wordpress_wordpress-testing || true

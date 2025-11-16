@@ -1,0 +1,8 @@
+# ignore git and docker artifacts
+.git
+.gitignore
+.dockerignore
+*.log
+
+# exclude wp-config.php from image
+wp-config.php
