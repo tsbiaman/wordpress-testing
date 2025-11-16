@@ -48,6 +48,10 @@ jobs:
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.1
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         with:
           host: ${{ secrets.TSBI_HOST }}
           username: ${{ secrets.TSBI_USER }}
@@ -55,6 +59,8 @@ jobs:
           script: |
             set -euo pipefail
             IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            # Login to registry on VPS
+            echo "${REGISTRY_PASSWORD}" | docker login ${REGISTRY} -u "${REGISTRY_USER}" --password-stdin
             # Export all vars from the server's .env so the stack uses same host paths
             # (it will set WP_TESTING_SOURCE_PATH, WP_TESTING_DB_PATH, WP_TESTING_PMA_DOMAIN, etc.)
             cd /data/ecosystem/deployments/wordpress
