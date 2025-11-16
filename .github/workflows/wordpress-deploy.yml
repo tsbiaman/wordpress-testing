@@ -65,6 +65,6 @@ jobs:
             set -o allexport; . .env 2>/dev/null || export $(grep -v '^#' .env | xargs || true); set +o allexport
             # update stack with the new image using env substitution
             export WP_TESTING_IMAGE=${IMAGE}
-            docker stack deploy -c /data/ecosystem/deployments/wordpress/stack-wordpress.yml wordpress
+            docker stack deploy --with-registry-auth -c /data/ecosystem/deployments/wordpress/stack-wordpress.yml wordpress
             # Optionally wait for service update to converge
-            docker service update --image ${IMAGE} wordpress_wordpress-testing || true
+            docker service update --with-registry-auth --image ${IMAGE} wordpress_wordpress-testing || true
