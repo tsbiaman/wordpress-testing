@@ -58,7 +58,9 @@ jobs:
             # Export all vars from the server's .env so the stack uses same host paths
             # (it will set WP_TESTING_SOURCE_PATH, WP_TESTING_DB_PATH, WP_TESTING_PMA_DOMAIN, etc.)
             cd /data/ecosystem/deployments/wordpress
-            export $(grep -v '^#' .env | xargs || true)
+            # Load env vars from repository .env with export to support values that contain
+            # `=` and spaces (fall back to the grep/xargs approach if `source` fails).
+            set -o allexport; . .env 2>/dev/null || export $(grep -v '^#' .env | xargs || true); set +o allexport
             # update stack with the new image using env substitution
             export WP_TESTING_IMAGE=${IMAGE}
             docker stack deploy -c /data/ecosystem/deployments/wordpress/stack-wordpress.yml wordpress
